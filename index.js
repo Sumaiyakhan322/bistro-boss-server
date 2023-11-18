@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const app=express()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
@@ -29,6 +30,28 @@ async function run() {
     const reviewsCollection=client.db('bistro').collection('reviews')
     const cartCollection=client.db('bistro').collection('carts')
     const usersCollection=client.db('bistro').collection('users')
+   //middleWares
+   const verifyToken=(req,res,next)=>{
+    // console.log(req.headers.authorization);
+    if(!req.headers.authorization){
+     return res.status(401).send({message:"Unauthorized"})
+    }
+    const token=req.headers.authorization.split(' ')[1]
+    jwt.verify(token,process.env.Access_Token,(err,decoded)=>{
+      if(err){
+      return  res.status(401).send({message:"Unauthorized"})
+      }
+      req.decoded=decoded
+      next()
+    })
+   }
+
+    //auth related apis
+    app.post('/jwt',async(req,res)=>{
+      const user=req.body
+      const token=jwt.sign(user,process.env.Access_Token,{expiresIn:'100h'})
+      res.send({token})
+    })
     //get the menus
     app.get('/menu',async(req,res)=>{
         const result=await menuCollection.find().toArray()
@@ -64,6 +87,7 @@ async function run() {
     //user
     app.post('/users',async(req,res)=>{
       const user=req.body;
+      
       //if the user already added for google
       const query={email:user.email};
       const existingUser=await usersCollection.findOne(query);
@@ -75,7 +99,8 @@ async function run() {
 
     })
     //get the users
-    app.get('/users',async (req,res)=>{
+    app.get('/users',verifyToken,async (req,res)=>{
+      
       const result=await usersCollection.find().toArray()
       res.send(result)
     })
@@ -87,7 +112,8 @@ async function run() {
       res.send(result)
 
     })
-    //make admin 
+    //make admin so set role as Admin
+     
     app.patch('/users/admin/:id',async(req,res)=>{
       const id=req.params.id;
       const filter={_id:new ObjectId(id)}
@@ -99,6 +125,19 @@ async function run() {
       const result=await usersCollection.updateOne(filter,updatedDoc)
       res.send(result)
       
+    })
+    app.get('/users/admin/:email',verifyToken,async(req,res)=>{
+      const email=req.params.email;
+      if(email !==req.decoded.email){
+        res.status(403).send({message:'forbidden'})
+      }
+      const query={email:email}
+      const user=await usersCollection.findOne(query)
+      let isAdmin=false
+      if(user){
+        isAdmin=user.role==='admin'
+      }
+       res.send({isAdmin})
     })
 
     // Send a ping to confirm a successful connection
