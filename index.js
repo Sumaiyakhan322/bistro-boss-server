@@ -30,7 +30,8 @@ async function run() {
     const reviewsCollection=client.db('bistro').collection('reviews')
     const cartCollection=client.db('bistro').collection('carts')
     const usersCollection=client.db('bistro').collection('users')
-   //middleWares
+   //middleWares 
+   //verify the token
    const verifyToken=(req,res,next)=>{
     // console.log(req.headers.authorization);
     if(!req.headers.authorization){
@@ -45,17 +46,52 @@ async function run() {
       next()
     })
    }
+   //verify admin
+   const verifyAdmin=async(req,res,next)=>{
+    const email=req.decoded.email;
+    const query={email:email}
+    const user=await usersCollection.findOne(query)
+    const isAdmin=user?.role==='admin';
+    if(!isAdmin){
+      return res.status(403).send('forbidden')
+    }
+    next()
 
-    //auth related apis
+   }
+
+    //auth related apis (post tokens)
     app.post('/jwt',async(req,res)=>{
       const user=req.body
       const token=jwt.sign(user,process.env.Access_Token,{expiresIn:'100h'})
       res.send({token})
     })
+
+
     //get the menus
     app.get('/menu',async(req,res)=>{
         const result=await menuCollection.find().toArray()
         res.send(result)
+    })
+    //get the menu for specific id
+    app.get('/menu/:id',async(req,res)=>{
+      const id=req.id.params;
+      const query={_id:id}
+      const result=await menuCollection.findOne(query)
+      res.send(result)
+    })
+    //post
+    app.post('/menu',verifyToken,verifyAdmin,async(req,res)=>{
+      const menus=req.body;
+      const result=await menuCollection.insertOne(menus);
+      res.send(result)
+    })
+    //delete
+    app.delete('/menu/:id',verifyToken,verifyAdmin,async(req,res)=>{
+      const id=req.params.id;
+      const query={_id:id};
+      // console.log(query);
+      const result=await menuCollection.deleteOne(query)
+      res.send(result);
     })
     //get the reviews
     app.get('/reviews',async(req,res)=>{
@@ -69,7 +105,7 @@ async function run() {
       res.send(result)
     
     })
-    //get the user only 
+    //get the user's cart  only 
     app.get('/carts',async(req,res)=>{
       const email=req.query.email
       const query={email:email}
@@ -84,7 +120,7 @@ async function run() {
       res.send(result)
     })
 
-    //user
+    //post the users and with google already have the email
     app.post('/users',async(req,res)=>{
       const user=req.body;
       
@@ -98,14 +134,14 @@ async function run() {
       res.send(result)
 
     })
-    //get the users
-    app.get('/users',verifyToken,async (req,res)=>{
+    //get the users 
+    app.get('/users',verifyToken,verifyAdmin,async (req,res)=>{
       
       const result=await usersCollection.find().toArray()
       res.send(result)
     })
     //delete a user
-    app.delete('/users/:id',async(req,res)=>{
+    app.delete('/users/:id',verifyToken,verifyAdmin,async(req,res)=>{
       const id=req.params.id;
       const query={_id:new ObjectId(id)}
       const result=await usersCollection.deleteOne(query)
@@ -113,8 +149,8 @@ async function run() {
 
     })
     //make admin so set role as Admin
-     
-    app.patch('/users/admin/:id',async(req,res)=>{
+
+    app.patch('/users/admin/:id',verifyToken,verifyAdmin,async(req,res)=>{
       const id=req.params.id;
       const filter={_id:new ObjectId(id)}
       const updatedDoc={
@@ -126,6 +162,7 @@ async function run() {
       res.send(result)
       
     })
+    //get the admin 
     app.get('/users/admin/:email',verifyToken,async(req,res)=>{
       const email=req.params.email;
       if(email !==req.decoded.email){
