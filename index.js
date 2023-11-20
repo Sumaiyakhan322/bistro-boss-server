@@ -74,9 +74,26 @@ async function run() {
     })
     //get the menu for specific id
     app.get('/menu/:id',async(req,res)=>{
-      const id=req.id.params;
+      const id=req.params.id;
       const query={_id:id}
       const result=await menuCollection.findOne(query)
+      res.send(result)
+    })
+    //patch
+    app.patch('/menu/:id',async(req,res)=>{
+      const id=req.params.id;
+      const filter={_id:id};
+      const item=req.body;
+      const updatedDoc={
+        $set:{
+          name:item.name,
+          price:item.price,
+          category:item.category,
+          image:item.image,
+          recipe:item.recipe
+        }
+      }
+      const result=await menuCollection.updateOne(filter,updatedDoc)
       res.send(result)
     })
     //post
