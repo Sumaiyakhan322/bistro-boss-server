@@ -94,7 +94,6 @@ async function run() {
         }
       }
       const result=await menuCollection.updateOne(filter,updatedDoc)
-      res.send(result)
     })
     //post
     app.post('/menu',verifyToken,verifyAdmin,async(req,res)=>{
